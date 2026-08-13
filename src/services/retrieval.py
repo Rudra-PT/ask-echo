@@ -66,7 +66,7 @@ def _build_sources(matches: list[dict]) -> list[dict]:
     return sources
 
 
-async def execute_rag(
+def answer_query(
     query: str,
     namespace: str = DEFAULT_NAMESPACE,
     top_k: int = TOP_K,

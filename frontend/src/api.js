@@ -1,4 +1,6 @@
-const BASE = 'https://ask-echo-backend.onrender.com';
+// In local dev, VITE_API_BASE is undefined → empty string → Vite proxy handles /upload/ and /query/
+// In production build, set VITE_API_BASE=https://ask-echo-backend.onrender.com in frontend/.env.production
+const BASE = import.meta.env.VITE_API_BASE ?? '';
 
 export async function uploadDocument(file) {
   const form = new FormData();
@@ -27,4 +29,4 @@ export async function queryDocuments(query, namespace = 'public', topK = 5) {
     throw new Error(msg);
   }
   return data;
-}
+}
