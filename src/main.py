@@ -16,6 +16,7 @@ app = FastAPI(
     title="Ask-Echo",
     version="0.1.0",
     description="Multi-format RAG backend powered by Gemini and Pinecone.",
+    redirect_slashes=False,
 )
 
 app.add_middleware(
