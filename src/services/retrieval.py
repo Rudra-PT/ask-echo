@@ -14,7 +14,7 @@ from src.services.vector import query_index
 logger = logging.getLogger(__name__)
 
 TOP_K: Final[int] = 5
-GENERATION_MODEL: Final[str] = "gemini-2.5-flash"
+GENERATION_MODEL: Final[str] = "gemini-2.0-flash"
 DEFAULT_NAMESPACE: Final[str] = "public"
 
 SYSTEM_PROMPT_TEMPLATE: Final[str] = """You are Ask-Echo, a precise document-grounded assistant.
