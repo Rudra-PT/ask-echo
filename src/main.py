@@ -18,7 +18,6 @@ app = FastAPI(
     description="Multi-format RAG backend powered by Gemini and Pinecone.",
 )
 
-# Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

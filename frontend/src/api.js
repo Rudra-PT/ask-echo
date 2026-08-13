@@ -3,7 +3,7 @@
 
 
 
-const BASE = '';  
+const BASE = 'https://ask-echo-backend.onrender.com';
 
 
 
@@ -23,13 +23,6 @@ export async function uploadDocument(file) {
   }
   return data;
 }
-
-
-
-
-
-
-
 
 export async function queryDocuments(query, namespace = 'public', topK = 5) {
   const res = await fetch(`${BASE}/query/`, {

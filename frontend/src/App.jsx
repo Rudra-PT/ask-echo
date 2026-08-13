@@ -10,9 +10,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  
+
   function handleUploadSuccess(result) {
-    
+
     const systemMessage = {
       id: `sys-${Date.now()}`,
       role: 'assistant',
@@ -41,7 +41,7 @@ export default function App() {
 
     try {
       const response = await queryDocuments(userMessageText, 'public', 5);
-      
+
       const assistantMsg = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
@@ -53,7 +53,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message || 'Failed to connect to the backend retrieval service.');
-      
+
       const errorMsgObj = {
         id: `error-${Date.now()}`,
         role: 'assistant',
@@ -75,14 +75,14 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {}
+      { }
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="app-logo">
             <EchoEchoLogo size={32} />
             <h1 className="app-logo-name">ask-echo</h1>
           </div>
-          <p className="app-tagline">Multi-format RAG document reader</p>
+          <p className="app-tagline">Just Your PDF Analyzer</p>
         </div>
 
         <div className="sidebar-body">
@@ -91,20 +91,20 @@ export default function App() {
         </div>
       </aside>
 
-      {}
+      { }
       <main className="chat-main">
         <header className="chat-header">
           <div>
             <h2 className="chat-header-title">Echo Chamber</h2>
-            <p className="chat-header-subtitle">Asking questions grounded strictly in your documents</p>
+            <p className="chat-header-subtitle">Just Ask Me From The PDF You Uploaded Cause I'm Not That Intelligent</p>
           </div>
           <div className="chat-status-dot" title="Active Connection" />
         </header>
 
-        {}
+        { }
         <ChatWindow messages={messages} isLoading={loading} />
 
-        {}
+        { }
         <footer className="chat-input-area">
           <form className="chat-input-form" onSubmit={handleSend}>
             <div className="chat-textarea-wrapper">
@@ -118,9 +118,9 @@ export default function App() {
                 rows={1}
               />
             </div>
-            <button 
-              type="submit" 
-              className="send-btn" 
+            <button
+              type="submit"
+              className="send-btn"
               disabled={!input.trim() || loading}
               aria-label="Send query"
             >
@@ -128,7 +128,7 @@ export default function App() {
             </button>
           </form>
           <p className="chat-input-hint">
-            Answers are generated strictly using your document chunks.
+            Answers are generated strictly using your document.
           </p>
         </footer>
       </main>
