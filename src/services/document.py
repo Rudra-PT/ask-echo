@@ -33,7 +33,7 @@ SUPPORTED_MIME_TYPES: Final[frozenset[str]] = frozenset(
 MIN_PDF_CHARS: Final[int] = 50
 
 
-VISION_MODEL: Final[str] = "models/gemini-2.5-flash"
+VISION_MODEL: Final[str] = "models/gemini-flash-latest"
 
 
 LEGIBILITY_FAILURE_PHRASES: Final[tuple[str, ...]] = (
