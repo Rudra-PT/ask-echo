@@ -60,6 +60,26 @@ def get_current_user(
         )
 
     token = credentials.credentials
+    if not token or not isinstance(token, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization token provided.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = token.strip()
+
+    # Google ID Token must be a valid raw JWT (3 base64url segments separated by exactly 2 dots)
+    if token.count(".") != 2:
+        logger.warning(
+            "Rejected token that is not a valid 3-part Google ID Token JWT (dots=%d)",
+            token.count("."),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token format: expected a Google JWT ID token with 3 segments. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
         id_info = id_token.verify_oauth2_token(
@@ -72,11 +92,11 @@ def get_current_user(
         logger.warning("Google ID token verification failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid or expired Google token: {exc}",
+            detail=f"Invalid or expired Google ID token: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     except Exception as exc:
-        logger.error("Unexpected error verifying Google token: %s", exc)
+        logger.error("Unexpected error verifying Google ID token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token verification failed. Please sign in again.",
