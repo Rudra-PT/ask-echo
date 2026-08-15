@@ -16,7 +16,7 @@ export default function App() {
     const systemMessage = {
       id: `sys-${Date.now()}`,
       role: 'assistant',
-      content: `System: Successfully processed and indexed "${result.filename}" (${result.chunks_extracted} chunks).`,
+      content: `System: Successfully processed and indexed "${result.file_name}" (${result.chunks_indexed} chunks).`,
       sources: []
     };
     setMessages((prev) => [...prev, systemMessage]);

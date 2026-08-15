@@ -119,6 +119,80 @@ def upsert_vectors(
     return total_upserted
 
 
+def upsert_records(
+    chunk_texts: list[str],
+    vectors: list[list[float]],
+    metadata_list: list[dict],
+    namespace: str,
+) -> int:
+    """
+    Upsert vectors into Pinecone where each vector carries its own metadata dict.
+
+    Unlike ``upsert_vectors``, metadata is per-chunk (not shared), allowing
+    fields like ``page_number`` and ``file_name`` to vary across chunks.
+
+    Args:
+        chunk_texts:   Raw text for each chunk (stored in metadata as "text"
+                       if not already present in the metadata dict).
+        vectors:       Embedding vectors — must be 1-to-1 with chunk_texts.
+        metadata_list: Per-chunk metadata dicts — must be 1-to-1 with chunk_texts.
+        namespace:     Pinecone namespace to upsert into.
+
+    Returns:
+        Total number of vectors confirmed upserted.
+    """
+    if not chunk_texts or not vectors or not metadata_list:
+        raise ValueError("chunk_texts, vectors, and metadata_list must all be non-empty.")
+
+    if not (len(chunk_texts) == len(vectors) == len(metadata_list)):
+        raise ValueError(
+            f"Length mismatch: chunk_texts={len(chunk_texts)}, "
+            f"vectors={len(vectors)}, metadata_list={len(metadata_list)}. "
+            "All three must have the same length."
+        )
+
+    index = _get_index()
+
+    records = [
+        {
+            "id": str(uuid.uuid4()),
+            "values": vec,
+            # metadata dict already contains "text", "file_name", "page_number",
+            # "created_at" etc. — we only inject "text" if caller forgot it.
+            "metadata": {"text": text, **meta},
+        }
+        for text, vec, meta in zip(chunk_texts, vectors, metadata_list)
+    ]
+
+    total_upserted = 0
+
+    for batch_start in range(0, len(records), UPSERT_BATCH_SIZE):
+        batch = records[batch_start : batch_start + UPSERT_BATCH_SIZE]
+        try:
+            response = index.upsert(vectors=batch, namespace=namespace)
+            upserted_count: int = getattr(response, "upserted_count", len(batch))
+            total_upserted += upserted_count
+            logger.debug(
+                "upsert_records: batch %d–%d (%d vectors) → namespace '%s'.",
+                batch_start,
+                batch_start + len(batch) - 1,
+                upserted_count,
+                namespace,
+            )
+        except Exception as exc:
+            raise IngestionError(
+                f"Pinecone upsert_records failed at batch index {batch_start}: {exc}"
+            ) from exc
+
+    logger.info(
+        "upsert_records complete: %d vector(s) → index '%s', namespace '%s'.",
+        total_upserted,
+        INDEX_NAME,
+        namespace,
+    )
+    return total_upserted
+
+
 def query_index(
     vector: list[float],
     namespace: str,

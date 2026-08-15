@@ -54,7 +54,7 @@ export function UploadPanel({ onUploadSuccess }) {
       const result = await uploadDocument(file);
       addLog(
         'success',
-        `✓ ${result.chunks_extracted} chunk${result.chunks_extracted !== 1 ? 's' : ''} indexed from "${result.filename}"`
+        `✓ ${result.chunks_indexed} chunk${result.chunks_indexed !== 1 ? 's' : ''} indexed from "${result.file_name}"`
       );
       onUploadSuccess?.(result);
       setFile(null);

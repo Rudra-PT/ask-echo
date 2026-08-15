@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.140.2",
     "google-genai>=2.14.0",
     "langchain-text-splitters>=1.1.2",
+    "pdfplumber>=0.11.10",
     "pinecone>=9.1.0",
     "pydantic-settings>=2.14.2",
     "pypdf>=6.14.2",
