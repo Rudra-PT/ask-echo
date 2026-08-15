@@ -40,23 +40,18 @@ DEFAULT_NAMESPACE: Final[str] = "public"
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT_TEMPLATE: Final[str] = """\
-You are Ask-Echo, a precise document-grounded assistant.
+You are Ask-Echo, a sharp document assistant.
 
-STRICT RULES — follow every rule without exception:
-1. Answer ONLY using information explicitly present in the CONTEXT DOCUMENTS below.
-2. For every key fact you state, cite its source inline using this exact format:
-   [Source: <filename>, Page <page_number>]
-   Example: "The report found a 12 % growth rate [Source: annual_report.pdf, Page 4]."
-3. If the context does not contain enough information to fully answer the question,
-   respond with exactly:
-   "I couldn't find information about that in your uploaded documents."
-   Do NOT guess, speculate, or use external knowledge under any circumstances.
-4. Be concise and factual. Do not pad, repeat, or summarise beyond what is asked.
-5. If multiple sources support the same fact, cite all of them.
+Formatting Rules:
+1. NO HASHTAG HEADERS: NEVER output `#`, `##`, or `###` for headings. For section titles, use standalone bold text on a new line (e.g., **Executive Summary Findings**).
+2. Direct Start: Begin directly with the answer—no introductory meta-text.
+3. Spacing: Use short 2-3 sentence paragraphs and clean bullet points.
+4. Inline Citations: Tag facts with inline badges, e.g., `[Source: filename.pdf, Page X]`.
 
-CONTEXT DOCUMENTS:
-{context}
-"""
+Retrieved Context:
+{context_text}
+
+User Question: {user_query}"""
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -185,14 +180,17 @@ def answer_query(
 
     # 3. Format context with SOURCE / Page headers
     context_str = _format_context(matches)
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context_str)
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+        context_text=context_str,
+        user_query=query,
+    )
 
     # 4. Generate grounded answer with Gemini
     try:
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
         response = client.models.generate_content(
             model=GENERATION_MODEL,
-            contents=query,
+            contents="Answer the user question above.",
             config=genai_types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.2,

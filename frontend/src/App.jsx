@@ -161,18 +161,18 @@ export default function App() {
   // ── Login gate ──────────────────────────────────────────────────────────
   if (!authReady) {
     return (
-      <div className="login-screen">
-        <div className="login-card">
-          <div className="login-logo">
+      <div className="login-screen min-h-screen w-screen flex items-center justify-center bg-[#FAF8F5]">
+        <div className="login-card flex flex-col items-center gap-4 p-8 bg-white border border-stone-200 rounded-2xl shadow-lg shadow-stone-200/50 max-w-md w-[90%] text-center">
+          <div className="login-logo mb-1">
             <EchoEchoLogo size={48} />
           </div>
-          <h1 className="login-title">ask-echo</h1>
-          <p className="login-subtitle">Your private, document-grounded AI assistant.</p>
-          <p className="login-desc">
+          <h1 className="login-title font-sans text-2xl font-bold tracking-wider text-stone-800 m-0">ask-echo</h1>
+          <p className="login-subtitle text-sm font-semibold text-amber-600 tracking-wide m-0">Your private, document-grounded AI assistant.</p>
+          <p className="login-desc text-xs text-stone-500 leading-relaxed max-w-xs m-0">
             Sign in to upload PDFs and ask questions. Your documents are stored privately — no one else can access them.
           </p>
           <button
-            className="google-signin-btn"
+            className="google-signin-btn flex items-center justify-center gap-3 mt-2 px-6 py-3 bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 hover:border-stone-300 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow min-w-[230px]"
             onClick={() => googleLogin()}
             id="google-signin-button"
             aria-label="Sign in with Google"

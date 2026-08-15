@@ -3,7 +3,7 @@
  * ─────────────────
  * Renders a single chat message with:
  *   • react-markdown for full markdown formatting (bold, lists, code, etc.)
- *   • Inline [Source: file.pdf, Page X] patterns replaced with styled pills
+ *   • Inline [Source: file.pdf, Page X] patterns replaced with styled amber pills
  *   • Source citation cards below the bubble (from Pinecone metadata)
  *   • TypingIndicator for the loading state
  */
@@ -14,10 +14,7 @@ import { SourceCard } from './SourceCard.jsx';
 import { EchoEchoLogo } from './EchoEchoLogo.jsx';
 
 // ── Citation pill ─────────────────────────────────────────────────────────────
-// Matches patterns like:
-//   [Source: filename.pdf, Page 3]
-//   [Source: report.pdf, Page 12]
-const CITATION_RE = /\[Source:\s*([^,\]]+),\s*Page\s*(\d+)\]/g;
+const CITATION_RE = /\[Source:\s*([^,\]]+),\s*[Pp]age\s*(\d+)\]/g;
 
 /**
  * Replace all [Source: X, Page N] patterns inside a text node with
@@ -51,41 +48,46 @@ function parseCitations(text) {
 /** A styled inline pill for a single citation reference. */
 function CitationPill({ fileName, page }) {
   return (
-    <span className="citation-pill" title={`${fileName}, Page ${page}`}>
-      <span className="citation-pill-icon">📄</span>
-      <span className="citation-pill-text">
-        {fileName}
-        <span className="citation-pill-page">p.{page}</span>
-      </span>
+    <span
+      className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-200/80 px-2 py-0.5 rounded-md text-xs font-medium mx-1 align-baseline shadow-xs select-none"
+      title={`${fileName}, Page ${page}`}
+    >
+      <span className="text-[11px]">📄</span>
+      <span className="truncate max-w-[160px] font-medium">{fileName}</span>
+      <span className="bg-amber-200/90 text-amber-950 px-1 rounded text-[11px] font-semibold">p.{page}</span>
     </span>
   );
 }
 
 // ── Custom react-markdown renderers ───────────────────────────────────────────
-// We override the <p> renderer so citation patterns inside paragraphs get
-// converted to pills. All other markdown elements render normally.
 function markdownComponents() {
   return {
-    // Replace citation patterns inside paragraph text nodes
     p({ children }) {
-      const processed = processChildren(children);
-      return <p>{processed}</p>;
+      return <p className="my-2 leading-relaxed">{processChildren(children)}</p>;
     },
-    // Style inline code
-    code({ inline, children, ...props }) {
-      if (inline) {
-        return <code className="md-inline-code" {...props}>{children}</code>;
-      }
-      return (
-        <pre className="md-code-block">
-          <code {...props}>{children}</code>
-        </pre>
-      );
+    li({ children }) {
+      return <li className="my-1 leading-relaxed">{processChildren(children)}</li>;
     },
-    // Open links in new tab safely
+    strong({ children }) {
+      return <strong className="font-semibold text-stone-900">{processChildren(children)}</strong>;
+    },
+    h1({ children }) {
+      return <h1 className="text-xl font-bold text-stone-900 my-3">{processChildren(children)}</h1>;
+    },
+    h2({ children }) {
+      return <h2 className="text-lg font-bold text-stone-900 my-2.5">{processChildren(children)}</h2>;
+    },
+    h3({ children }) {
+      return <h3 className="text-base font-semibold text-stone-900 my-2">{processChildren(children)}</h3>;
+    },
     a({ href, children }) {
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="md-link">
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-amber-700 hover:text-amber-800 font-medium underline underline-offset-2"
+        >
           {children}
         </a>
       );
@@ -108,7 +110,6 @@ function processChildren(children) {
     : children;
 }
 
-
 // ── MessageBubble ─────────────────────────────────────────────────────────────
 export function MessageBubble({ message }) {
   const isUser = message.role === 'user';
@@ -122,11 +123,11 @@ export function MessageBubble({ message }) {
       <div className="bubble-group">
         <div className="bubble">
           {isUser ? (
-            // User messages: plain text (no markdown needed)
+            // User messages: plain text
             <span>{message.content}</span>
           ) : (
             // Assistant messages: full markdown + citation pills
-            <div className="md-body">
+            <div className="prose prose-stone max-w-none text-stone-800 leading-relaxed font-sans">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={markdownComponents()}
@@ -154,7 +155,6 @@ export function MessageBubble({ message }) {
     </div>
   );
 }
-
 
 // ── TypingIndicator ───────────────────────────────────────────────────────────
 export function TypingIndicator() {

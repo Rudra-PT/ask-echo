@@ -20,11 +20,11 @@ const PIXEL_MAP = [
 
 export function EchoEchoLogo({ className, size = 36 }) {
   const colors = {
-    'X': '#111111', 
-    'W': '#E6E8EA', 
-    'H': '#6A7B8C', 
-    'G': '#39FF14', 
-    'K': '#1B1E24', 
+    'X': '#292524', // deep warm stone (border/outline)
+    'W': '#FAF8F5', // warm cream / light
+    'H': '#A8A29E', // stone 400
+    'G': '#D97706', // warm amber / terracotta
+    'K': '#44403C', // stone 700
   };
 
   return (
@@ -41,13 +41,13 @@ export function EchoEchoLogo({ className, size = 36 }) {
           if (char === '.') return null;
           return (
             <rect 
-              key={`${x}-${y}`} 
-              x={x} 
-              y={y} 
-              width={1} 
-              height={1} 
-              fill={colors[char]} 
-            />
+            key={`${x}-${y}`} 
+            x={x} 
+            y={y} 
+            width={1} 
+            height={1} 
+            fill={colors[char]} 
+          />
           );
         })
       )}
