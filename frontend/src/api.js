@@ -3,32 +3,48 @@
  * ────────────────────
  * All HTTP calls to the Ask-Echo backend.
  *
- * Session isolation:
- *   Each browser tab gets a persistent UUID stored in sessionStorage
- *   under the key "echo_session_id".  That UUID is used as the Pinecone
- *   namespace, so every user's vectors are completely isolated from others.
+ * Authentication:
+ *   Call setAuthToken(googleIdToken) after a successful Google Sign-In.
+ *   Every subsequent API request automatically includes:
+ *     Authorization: Bearer <token>
+ *
+ * Namespace isolation:
+ *   The server derives the Pinecone namespace from the verified user identity
+ *   (sub claim of the JWT). No client-side namespace logic is needed.
  */
 
-// Production Render URL — used in all environments (Vercel serves the built
-// bundle, which always talks to the live backend).
 const BASE = 'https://ask-echo-backend.onrender.com';
 
 // ---------------------------------------------------------------------------
-// Session helpers
+// Auth token store — module-level (lives for the page session)
 // ---------------------------------------------------------------------------
 
+let _authToken = null;
+
+/** Store the Google ID token after sign-in. */
+export function setAuthToken(token) {
+  _authToken = token;
+}
+
+/** Clear the stored token (call on sign-out). */
+export function clearAuthToken() {
+  _authToken = null;
+}
+
+/** Returns true when a token is available. */
+export function isAuthenticated() {
+  return Boolean(_authToken);
+}
+
 /**
- * Returns a stable session UUID for this browser tab.
- * Creates and persists one in sessionStorage on first call.
+ * Build standard auth headers.
+ * Throws if the user is not signed in.
  */
-export function getSessionId() {
-  const KEY = 'echo_session_id';
-  let id = sessionStorage.getItem(KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(KEY, id);
+function authHeaders() {
+  if (!_authToken) {
+    throw new Error('Not authenticated. Please sign in with Google.');
   }
-  return id;
+  return { Authorization: `Bearer ${_authToken}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -37,8 +53,7 @@ export function getSessionId() {
 
 /**
  * Upload and ingest a document.
- * The session UUID is used as the Pinecone namespace so vectors are
- * isolated per browser tab.
+ * Namespace is derived server-side from the verified user identity.
  *
  * @param {File} file  - PDF, JPEG, or PNG to ingest.
  * @returns {Promise<{status: string, file_name: string, chunks_indexed: number}>}
@@ -46,9 +61,14 @@ export function getSessionId() {
 export async function uploadDocument(file) {
   const form = new FormData();
   form.append('file', file);
-  form.append('namespace', getSessionId());
+  // namespace field accepted by the server for compat but overridden server-side
+  form.append('namespace', 'user_scoped');
 
-  const res = await fetch(`${BASE}/upload`, { method: 'POST', body: form });
+  const res = await fetch(`${BASE}/upload`, {
+    method: 'POST',
+    headers: authHeaders(), // DO NOT set Content-Type — browser sets multipart boundary
+    body: form,
+  });
   const data = await res.json();
 
   if (!res.ok) {
@@ -60,7 +80,7 @@ export async function uploadDocument(file) {
 
 /**
  * Query the document store for a grounded answer.
- * Automatically scoped to the current session's namespace.
+ * Scoped to the authenticated user's namespace (server-enforced).
  *
  * @param {string} query  - Natural-language question.
  * @returns {Promise<{answer: string, sources: Array<object>}>}
@@ -68,8 +88,11 @@ export async function uploadDocument(file) {
 export async function queryDocuments(query) {
   const res = await fetch(`${BASE}/query`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, namespace: getSessionId() }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ query }),
   });
   const data = await res.json();
 
@@ -81,15 +104,15 @@ export async function queryDocuments(query) {
 }
 
 /**
- * Delete all vectors in the current session's namespace.
- * Call this when the user wants to start fresh.
+ * Delete all vectors for the currently signed-in user.
+ * Namespace is determined server-side from the auth token.
  *
  * @returns {Promise<{status: string, namespace: string}>}
  */
 export async function clearSession() {
-  const ns = getSessionId();
-  const res = await fetch(`${BASE}/upload/clear?namespace=${encodeURIComponent(ns)}`, {
+  const res = await fetch(`${BASE}/upload/clear`, {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   const data = await res.json();
 

@@ -3,9 +3,11 @@ src/api/query.py
 ─────────────────
 Document query endpoint.
 
-Accepts a JSON body with `query`, `namespace`, and optional `top_k`.
-Registered on both /query and /query/ to prevent 307 redirect issues.
+Requires a valid Google ID token in the Authorization header.
+The Pinecone namespace is derived server-side as f"user_{user_id}" —
+any namespace field in the request body is ignored.
 
+Registered on both /query and /query/ to prevent 307 redirect issues.
 Response: {"answer": str, "sources": list[dict]}
 """
 
@@ -13,9 +15,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from src.core.auth import get_current_user
 from src.core.exceptions import EmbeddingError, IngestionError
 from src.services import retrieval
 
@@ -37,9 +40,10 @@ class QueryRequest(BaseModel):
         description="The natural-language question to answer from the document store.",
         examples=["What does this document say about the revenue growth?"],
     )
+    # namespace is accepted for API compatibility but overridden server-side
     namespace: str = Field(
-        default="public",
-        description="Pinecone namespace to search (default: 'public').",
+        default="ignored",
+        description="Ignored — namespace is derived from the authenticated user's identity.",
     )
     top_k: int = Field(
         default=5,
@@ -71,19 +75,27 @@ class QueryResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def _handle_query(body: QueryRequest) -> QueryResponse:
-    """Core logic shared by both route decorators."""
+async def _handle_query(
+    body: QueryRequest,
+    user_id: str,
+) -> QueryResponse:
+    """Core logic — namespace is always derived from user_id."""
+
+    # Server-side namespace override — client cannot influence this
+    namespace = f"user_{user_id}"
+
     logger.info(
-        "Query request — query=%r  namespace=%r  top_k=%d",
-        body.query[:80],
-        body.namespace,
+        "Query: user=%s  namespace=%r  top_k=%d  query=%r",
+        user_id,
+        namespace,
         body.top_k,
+        body.query[:80],
     )
 
     try:
         result = retrieval.answer_query(
             query=body.query,
-            namespace=body.namespace,
+            namespace=namespace,
             top_k=body.top_k,
         )
     except EmbeddingError as exc:
@@ -120,16 +132,19 @@ _ROUTE_KWARGS = dict(
     status_code=status.HTTP_200_OK,
     summary="Query the document store and get a grounded answer",
     description=(
+        "Requires: Authorization: Bearer <Google ID token>. "
         "Embeds the query with Gemini text-embedding (768-dim), retrieves the "
-        "top-K most relevant chunks from Pinecone (include_metadata=True), "
+        "top-K most relevant chunks from the authenticated user's Pinecone namespace, "
         "and asks Gemini to answer strictly from the retrieved context. "
-        "Each fact is cited inline as [Source: filename.pdf, Page X]. "
-        "Returns the generated answer and full source metadata."
+        "Each fact is cited inline as [Source: filename.pdf, Page X]."
     ),
 )
 
 
 @router.post("", include_in_schema=False, **_ROUTE_KWARGS)
 @router.post("/", **_ROUTE_KWARGS)
-async def query_documents(body: QueryRequest) -> QueryResponse:
-    return await _handle_query(body)
+async def query_documents(
+    body: QueryRequest,
+    user_id: str = Depends(get_current_user),
+) -> QueryResponse:
+    return await _handle_query(body=body, user_id=user_id)

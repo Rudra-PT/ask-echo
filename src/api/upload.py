@@ -1,24 +1,23 @@
 """
 src/api/upload.py
 ─────────────────
-Document ingestion endpoint.
+Document ingestion + session-clear endpoints.
 
-Accepts a PDF, JPEG, or PNG via multipart/form-data, extracts text
-page-by-page (pdfplumber → pypdf fallback for PDFs; Gemini Vision for
-images), splits into chunks, embeds with Gemini, and upserts into Pinecone
-under the caller-supplied namespace.
+All routes require a valid Google ID token in the Authorization header.
+The Pinecone namespace is derived server-side as f"user_{user_id}" —
+any client-supplied namespace field is ignored, guaranteeing isolation.
 
-Two route variants are registered so both /upload and /upload/ work
-without a 307 redirect (redirect_slashes=False is set on the app).
+Two POST variants (/upload and /upload/) avoid 307 redirects.
 """
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
+from src.core.auth import get_current_user
 from src.core.exceptions import (
     CorruptDocumentError,
     EmbeddingError,
@@ -35,7 +34,7 @@ router = APIRouter(prefix="/upload", tags=["Ingestion"])
 
 
 # ---------------------------------------------------------------------------
-# Response schema
+# Response schemas
 # ---------------------------------------------------------------------------
 
 
@@ -51,12 +50,18 @@ class ClearResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Handler — registered on both "" and "/" so neither triggers a redirect
+# Shared upload handler
 # ---------------------------------------------------------------------------
 
 
-async def _handle_upload(file: UploadFile, namespace: str) -> UploadResponse:
-    """Shared implementation used by both route decorators."""
+async def _handle_upload(
+    file: UploadFile,
+    user_id: str,
+) -> UploadResponse:
+    """Shared implementation used by both POST route decorators."""
+
+    # Server-side namespace — client cannot influence this
+    namespace = f"user_{user_id}"
 
     mime_type: str = file.content_type or ""
     filename: str = file.filename or "unknown"
@@ -72,7 +77,8 @@ async def _handle_upload(file: UploadFile, namespace: str) -> UploadResponse:
         )
 
     logger.info(
-        "Upload received: filename='%s', mime='%s', namespace='%s'",
+        "Upload: user=%s  file='%s'  mime='%s'  namespace='%s'",
+        user_id,
         filename,
         mime_type,
         namespace,
@@ -119,7 +125,7 @@ async def _handle_upload(file: UploadFile, namespace: str) -> UploadResponse:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
     logger.info(
-        "Ingestion complete: %d chunk(s) indexed for '%s' → namespace '%s'.",
+        "Ingestion complete: %d chunk(s) for '%s' → namespace '%s'.",
         chunks_indexed,
         filename,
         namespace,
@@ -132,13 +138,17 @@ async def _handle_upload(file: UploadFile, namespace: str) -> UploadResponse:
     )
 
 
-# Dual decorators so both /upload and /upload/ are served without a redirect.
+# ---------------------------------------------------------------------------
+# POST /upload  +  POST /upload/   — dual routes, no 307 redirect
+# ---------------------------------------------------------------------------
+
+
 @router.post(
     "",
     response_model=UploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Ingest a document (no trailing slash)",
-    include_in_schema=False,  # hide duplicate from OpenAPI docs
+    include_in_schema=False,
 )
 @router.post(
     "/",
@@ -146,21 +156,24 @@ async def _handle_upload(file: UploadFile, namespace: str) -> UploadResponse:
     status_code=status.HTTP_201_CREATED,
     summary="Ingest a document into the vector store",
     description=(
+        "Requires: Authorization: Bearer <Google ID token>. "
         "Accepts a PDF, JPEG, or PNG via multipart/form-data. "
-        "Extracts text page-by-page, splits into chunks (size=1000, overlap=150), "
-        "embeds with Gemini, and upserts into Pinecone under the given namespace. "
+        "Namespace is derived server-side from the verified user identity. "
         "Returns the count of indexed chunks."
     ),
 )
 async def upload_document(
     file: UploadFile,
-    namespace: str = Form(..., description="Pinecone namespace to upsert vectors into."),
+    # namespace from client is accepted in the form but intentionally ignored —
+    # the real namespace is derived from user_id inside _handle_upload.
+    namespace: str = Form(default="ignored"),
+    user_id: str = Depends(get_current_user),
 ) -> UploadResponse:
-    return await _handle_upload(file=file, namespace=namespace)
+    return await _handle_upload(file=file, user_id=user_id)
 
 
 # ---------------------------------------------------------------------------
-# DELETE /upload/clear — wipe all vectors in a namespace
+# DELETE /upload/clear — wipe all vectors for the authenticated user
 # ---------------------------------------------------------------------------
 
 
@@ -168,30 +181,24 @@ async def upload_document(
     "/clear",
     response_model=ClearResponse,
     status_code=status.HTTP_200_OK,
-    summary="Clear all vectors in a session namespace",
+    summary="Clear all vectors for the current user",
     description=(
-        "Deletes every vector stored under the given Pinecone namespace. "
-        "Used to reset a user session so the next upload starts fresh."
+        "Requires: Authorization: Bearer <Google ID token>. "
+        "Deletes every vector stored under the authenticated user's namespace. "
+        "The namespace is derived server-side — no client input required."
     ),
 )
 def clear_namespace(
-    namespace: str = Query(
-        ...,
-        description="Pinecone namespace whose vectors should be deleted.",
-    ),
+    user_id: str = Depends(get_current_user),
 ) -> ClearResponse:
     from src.services.vector import _get_index  # local import avoids circular dep
 
-    if not namespace or not namespace.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="namespace query parameter must not be empty.",
-        )
+    namespace = f"user_{user_id}"
 
     try:
         index = _get_index()
         index.delete(delete_all=True, namespace=namespace)
-        logger.info("Cleared all vectors in namespace '%s'.", namespace)
+        logger.info("Cleared namespace '%s' for user %s.", namespace, user_id)
     except Exception as exc:
         logger.error("Failed to clear namespace '%s': %s", namespace, exc)
         raise HTTPException(

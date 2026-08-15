@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "apscheduler>=3.10.4",
     "fastapi>=0.140.2",
+    "google-auth>=2.56.2",
     "google-genai>=2.14.0",
     "langchain-text-splitters>=1.1.2",
     "pdfplumber>=0.11.10",
