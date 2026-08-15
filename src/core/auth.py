@@ -81,11 +81,22 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Support single or comma-separated list of allowed Google Client IDs
+    allowed_audiences = [
+        cid.strip()
+        for cid in settings.GOOGLE_CLIENT_ID.split(",")
+        if cid.strip()
+    ]
+    audience_param = (
+        allowed_audiences if len(allowed_audiences) > 1
+        else (allowed_audiences[0] if allowed_audiences else None)
+    )
+
     try:
         id_info = id_token.verify_oauth2_token(
             token,
             google_requests.Request(),
-            audience=settings.GOOGLE_CLIENT_ID,
+            audience=audience_param,
         )
     except ValueError as exc:
         # ValueError is raised for any invalid/expired/wrong-audience token
