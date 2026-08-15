@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Final
 
@@ -74,12 +75,14 @@ def upsert_vectors(
     extra: dict = metadata_extra or {}
 
     
+    now_ts: float = time.time()
     records = [
         {
             "id": str(uuid.uuid4()),
             "values": vector,
             "metadata": {
                 "text": chunk,
+                "created_at": now_ts,
                 **extra,
             },
         }
