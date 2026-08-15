@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
 from src.core.exceptions import (
@@ -43,6 +43,11 @@ class UploadResponse(BaseModel):
     status: str
     file_name: str
     chunks_indexed: int
+
+
+class ClearResponse(BaseModel):
+    status: str
+    namespace: str
 
 
 # ---------------------------------------------------------------------------
@@ -152,3 +157,46 @@ async def upload_document(
     namespace: str = Form(..., description="Pinecone namespace to upsert vectors into."),
 ) -> UploadResponse:
     return await _handle_upload(file=file, namespace=namespace)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /upload/clear — wipe all vectors in a namespace
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/clear",
+    response_model=ClearResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Clear all vectors in a session namespace",
+    description=(
+        "Deletes every vector stored under the given Pinecone namespace. "
+        "Used to reset a user session so the next upload starts fresh."
+    ),
+)
+def clear_namespace(
+    namespace: str = Query(
+        ...,
+        description="Pinecone namespace whose vectors should be deleted.",
+    ),
+) -> ClearResponse:
+    from src.services.vector import _get_index  # local import avoids circular dep
+
+    if not namespace or not namespace.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="namespace query parameter must not be empty.",
+        )
+
+    try:
+        index = _get_index()
+        index.delete(delete_all=True, namespace=namespace)
+        logger.info("Cleared all vectors in namespace '%s'.", namespace)
+    except Exception as exc:
+        logger.error("Failed to clear namespace '%s': %s", namespace, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to clear namespace: {exc}",
+        ) from exc
+
+    return ClearResponse(status="cleared", namespace=namespace)

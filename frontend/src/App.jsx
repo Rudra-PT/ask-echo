@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { UploadPanel } from './components/UploadPanel.jsx';
 import { ChatWindow } from './components/ChatWindow.jsx';
 import { EchoEchoLogo } from './components/EchoEchoLogo.jsx';
-import { queryDocuments } from './api.js';
+import { queryDocuments, clearSession } from './api.js';
 
 export default function App() {
   const [messages, setMessages] = useState([]);
@@ -40,7 +40,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const response = await queryDocuments(userMessageText, 'public', 5);
+      const response = await queryDocuments(userMessageText);
 
       const assistantMsg = {
         id: `ai-${Date.now()}`,
