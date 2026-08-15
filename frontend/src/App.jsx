@@ -5,62 +5,84 @@ import { EchoEchoLogo } from './components/EchoEchoLogo.jsx';
 import { queryDocuments, clearSession } from './api.js';
 
 export default function App() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [messages, setMessages]   = useState([]);
+  const [input, setInput]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [clearing, setClearing]   = useState(false);
+  const [uploadKey, setUploadKey] = useState(0); // bump to reset UploadPanel
 
-
+  // ── Upload success ────────────────────────────────────────────────────────
   function handleUploadSuccess(result) {
-
-    const systemMessage = {
-      id: `sys-${Date.now()}`,
-      role: 'assistant',
-      content: `System: Successfully processed and indexed "${result.file_name}" (${result.chunks_indexed} chunks).`,
-      sources: []
-    };
-    setMessages((prev) => [...prev, systemMessage]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id:      `sys-${Date.now()}`,
+        role:    'assistant',
+        content: `✓ **${result.file_name}** indexed — ${result.chunks_indexed} chunk${result.chunks_indexed !== 1 ? 's' : ''} ready to query.`,
+        sources: [],
+      },
+    ]);
   }
 
+  // ── Clear session ─────────────────────────────────────────────────────────
+  async function handleClear() {
+    if (clearing || loading) return;
+    setClearing(true);
+    try {
+      await clearSession();
+      setMessages([]);           // wipe chat history
+      setInput('');
+      setUploadKey((k) => k + 1); // remount UploadPanel → resets its state
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id:      `err-${Date.now()}`,
+          role:    'assistant',
+          content: `⚠ Could not clear session: ${err.message}`,
+          sources: [],
+        },
+      ]);
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  // ── Send query ────────────────────────────────────────────────────────────
   async function handleSend(e) {
     if (e) e.preventDefault();
     if (!input.trim() || loading) return;
 
-    const userMessageText = input.trim();
+    const text = input.trim();
     setInput('');
-    setErrorMsg('');
 
-    const userMsg = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: userMessageText
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [
+      ...prev,
+      { id: `user-${Date.now()}`, role: 'user', content: text, sources: [] },
+    ]);
     setLoading(true);
 
     try {
-      const response = await queryDocuments(userMessageText);
-
-      const assistantMsg = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: response.answer,
-        sources: response.sources || []
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
+      const res = await queryDocuments(text);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id:      `ai-${Date.now()}`,
+          role:    'assistant',
+          content: res.answer,
+          sources: res.sources || [],
+        },
+      ]);
     } catch (err) {
-      console.error(err);
-      setErrorMsg(err.message || 'Failed to connect to the backend retrieval service.');
-
-      const errorMsgObj = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: `Error: ${err.message || 'Failed to retrieve grounded answer.'}`,
-        sources: []
-      };
-      setMessages((prev) => [...prev, errorMsgObj]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id:      `error-${Date.now()}`,
+          role:    'assistant',
+          content: `⚠ ${err.message || 'Failed to retrieve grounded answer.'}`,
+          sources: [],
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -73,9 +95,10 @@ export default function App() {
     }
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="app-shell">
-      { }
+      {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="app-logo">
@@ -87,24 +110,41 @@ export default function App() {
 
         <div className="sidebar-body">
           <h2 className="sidebar-section-title">Knowledge Base</h2>
-          <UploadPanel onUploadSuccess={handleUploadSuccess} />
+
+          {/* Upload panel — key forces remount on clear */}
+          <UploadPanel key={uploadKey} onUploadSuccess={handleUploadSuccess} />
+
+          {/* ── Clear Knowledge Base button ── */}
+          <button
+            className="clear-kb-btn"
+            onClick={handleClear}
+            disabled={clearing || loading}
+            aria-busy={clearing}
+            title="Delete all indexed vectors and reset the chat"
+          >
+            {clearing ? (
+              <><span className="spinner dark" aria-hidden="true" /> Clearing…</>
+            ) : (
+              <>🗑 Clear Knowledge Base</>
+            )}
+          </button>
         </div>
       </aside>
 
-      { }
+      {/* ── Chat main ── */}
       <main className="chat-main">
         <header className="chat-header">
           <div>
             <h2 className="chat-header-title">Echo Chamber</h2>
-            <p className="chat-header-subtitle">Just Ask Me From The PDF You Uploaded Cause I'm Not That Intelligent</p>
+            <p className="chat-header-subtitle">
+              Just Ask Me From The PDF You Uploaded Cause I&apos;m Not That Intelligent
+            </p>
           </div>
           <div className="chat-status-dot" title="Active Connection" />
         </header>
 
-        { }
         <ChatWindow messages={messages} isLoading={loading} />
 
-        { }
         <footer className="chat-input-area">
           <form className="chat-input-form" onSubmit={handleSend}>
             <div className="chat-textarea-wrapper">
@@ -113,7 +153,7 @@ export default function App() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask something about the uploaded documents..."
+                placeholder="Ask something about the uploaded documents…"
                 disabled={loading}
                 rows={1}
               />
