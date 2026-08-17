@@ -2,20 +2,9 @@ import { useEffect, useRef } from 'react';
 import { MessageBubble, TypingIndicator } from './MessageBubble.jsx';
 import { EchoEchoLogo } from './EchoEchoLogo.jsx';
 
-const ACCEPTED_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
-
-
-
-
-
-
-
-
-
 export function ChatWindow({ messages, isLoading }) {
   const bottomRef = useRef(null);
 
-  
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);

@@ -4,13 +4,6 @@ import { uploadDocument } from '../api.js';
 const ACCEPTED = '.pdf,.jpg,.jpeg,.png';
 const ACCEPTED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
-
-
-
-
-
-
-
 export function UploadPanel({ onUploadSuccess }) {
   const [file, setFile]       = useState(null);
   const [dragOver, setDrag]   = useState(false);
@@ -35,7 +28,6 @@ export function UploadPanel({ onUploadSuccess }) {
 
   function onInputChange(e) {
     handleFile(e.target.files?.[0]);
-    
     e.target.value = '';
   }
 
@@ -69,7 +61,6 @@ export function UploadPanel({ onUploadSuccess }) {
 
   return (
     <div className="upload-panel">
-      {}
       <div
         className={`drop-zone${dragOver ? ' drag-over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -97,7 +88,6 @@ export function UploadPanel({ onUploadSuccess }) {
         <span className="drop-zone-sub">PDF · JPEG · PNG</span>
       </div>
 
-      {}
       {file && (
         <div className="upload-file-row">
           <span className="upload-file-name" title={file.name}>{file.name}</span>
@@ -111,7 +101,6 @@ export function UploadPanel({ onUploadSuccess }) {
         </div>
       )}
 
-      {}
       <button
         className="upload-btn"
         onClick={handleUpload}
@@ -123,7 +112,6 @@ export function UploadPanel({ onUploadSuccess }) {
           : '↑ Ingest Document'}
       </button>
 
-      {}
       {log.length > 0 && (
         <div className="upload-log" aria-live="polite" aria-atomic="false">
           {log.map((entry) => (

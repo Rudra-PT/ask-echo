@@ -1,15 +1,7 @@
 """
 src/services/retrieval.py
 ─────────────────────────
-RAG query pipeline.
-
-Steps:
-  1. Embed the user query with Gemini text-embedding.
-  2. Query Pinecone (include_metadata=True) in the requested namespace.
-  3. Format context blocks with SOURCE / Page headers.
-  4. Generate a grounded answer with gemini-flash-latest, instructing
-     inline citations as [Source: filename.pdf, Page X].
-  5. Return {"answer": str, "sources": list[dict]}.
+RAG query and answer generation pipeline.
 """
 
 from __future__ import annotations
@@ -27,17 +19,9 @@ from src.services.vector import query_index
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 TOP_K: Final[int] = 5
 GENERATION_MODEL: Final[str] = "models/gemini-flash-latest"
 DEFAULT_NAMESPACE: Final[str] = "public"
-
-# ---------------------------------------------------------------------------
-# System prompt
-# ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT_TEMPLATE: Final[str] = """\
 You are Ask-Echo, a sharp document assistant.
@@ -53,28 +37,15 @@ Retrieved Context:
 
 User Question: {user_query}"""
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 
 def _format_context(matches: list[dict]) -> str:
-    """
-    Format Pinecone matches into numbered context blocks for the system prompt.
-
-    Each block uses the header:
-        --- SOURCE: {file_name} | Page {page_number} ---
-    so the model can produce precise inline citations.
-    """
+    """Format Pinecone matches into structured context blocks for citation."""
     if not matches:
         return "No relevant context found."
 
     blocks: list[str] = []
     for i, match in enumerate(matches, 1):
         meta = match.get("metadata", {})
-
-        # Support both new metadata keys (file_name / page_number set by
-        # upload_service) and legacy keys (source_filename) for backward compat.
         file_name = (
             meta.get("file_name")
             or meta.get("source_filename")
@@ -90,12 +61,7 @@ def _format_context(matches: list[dict]) -> str:
 
 
 def _build_sources(matches: list[dict]) -> list[dict]:
-    """
-    Build the structured sources list returned in the API response.
-
-    Each entry contains the full metadata dict enriched with rank and score,
-    so the frontend can render file name, page number, preview, etc.
-    """
+    """Build structured metadata list for retrieved chunks."""
     sources: list[dict] = []
     for i, match in enumerate(matches, 1):
         meta = match.get("metadata", {})
@@ -103,27 +69,18 @@ def _build_sources(matches: list[dict]) -> list[dict]:
 
         sources.append(
             {
-                # Ranking / retrieval info
                 "rank": i,
                 "id": match.get("id", ""),
                 "score": match.get("score", 0.0),
-                # New metadata fields (set by upload_service)
                 "file_name": meta.get("file_name") or meta.get("source_filename", "unknown"),
                 "page_number": meta.get("page_number", None),
-                # Legacy / supplementary fields
                 "source_filename": meta.get("source_filename", "unknown"),
                 "mime_type": meta.get("mime_type", "unknown"),
                 "created_at": meta.get("created_at", None),
-                # Text preview for UI display
                 "text_preview": text[:200] if text else "",
             }
         )
     return sources
-
-
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
 
 
 def answer_query(
@@ -131,22 +88,11 @@ def answer_query(
     namespace: str = DEFAULT_NAMESPACE,
     top_k: int = TOP_K,
 ) -> dict:
-    """
-    Full RAG pipeline: embed → retrieve → generate → return.
-
-    Returns:
-        {
-            "answer":          str,
-            "sources":         list[dict],   # one entry per retrieved chunk
-            "query":           str,
-            "namespace":       str,
-            "chunks_retrieved": int,
-        }
-    """
+    """Full RAG pipeline: embed → retrieve → generate → return."""
     if not query or not query.strip():
         raise ValueError("Query string cannot be empty.")
 
-    # 1. Embed the query
+    # 1. Embed query
     try:
         query_embeddings = embed_chunks([query])
         if not query_embeddings:
@@ -158,7 +104,7 @@ def answer_query(
         logger.error("Unexpected error generating query embedding: %s", exc)
         raise EmbeddingError(f"Embedding failed: {exc}") from exc
 
-    # 2. Query Pinecone (include_metadata=True handled inside query_index)
+    # 2. Query Pinecone
     try:
         matches = query_index(
             vector=query_vector,
@@ -178,14 +124,14 @@ def answer_query(
         query[:80],
     )
 
-    # 3. Format context with SOURCE / Page headers
+    # 3. Format context with source metadata
     context_str = _format_context(matches)
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         context_text=context_str,
         user_query=query,
     )
 
-    # 4. Generate grounded answer with Gemini
+    # 4. Generate grounded answer
     try:
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
         response = client.models.generate_content(
@@ -208,7 +154,6 @@ def answer_query(
         logger.error("LLM generation failed: %s", exc)
         raise RuntimeError(f"Generation error: {exc}") from exc
 
-    # 5. Build and return full payload
     sources = _build_sources(matches)
     return {
         "answer": answer,

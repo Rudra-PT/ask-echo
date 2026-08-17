@@ -11,18 +11,14 @@ import {
 } from './api.js';
 
 export default function App() {
-  // ── Auth state ──────────────────────────────────────────────────────────
-  const [user, setUser]           = useState(null);  // { name, email, picture, sub }
+  const [user, setUser]           = useState(null);
   const [authReady, setAuthReady] = useState(false);
-
-  // ── Chat state ──────────────────────────────────────────────────────────
   const [messages, setMessages]   = useState([]);
   const [input, setInput]         = useState('');
   const [loading, setLoading]     = useState(false);
   const [clearing, setClearing]   = useState(false);
   const [uploadKey, setUploadKey] = useState(0);
 
-  // ── Sign out ────────────────────────────────────────────────────────────
   function handleSignOut() {
     clearAuthToken();
     setUser(null);
@@ -32,7 +28,6 @@ export default function App() {
     setUploadKey((k) => k + 1);
   }
 
-  // ── Upload success ──────────────────────────────────────────────────────
   function handleUploadSuccess(result) {
     setMessages((prev) => [
       ...prev,
@@ -45,7 +40,6 @@ export default function App() {
     ]);
   }
 
-  // ── Clear session ───────────────────────────────────────────────────────
   async function handleClear() {
     if (clearing || loading) return;
     setClearing(true);
@@ -69,7 +63,6 @@ export default function App() {
     }
   }
 
-  // ── Send query ──────────────────────────────────────────────────────────
   async function handleSend(e) {
     if (e) e.preventDefault();
     if (!input.trim() || loading) return;
@@ -115,7 +108,6 @@ export default function App() {
     }
   }
 
-  // ── Login gate ──────────────────────────────────────────────────────────
   if (!authReady) {
     return (
       <div className="login-screen min-h-screen w-screen flex items-center justify-center bg-[#FAF8F5]">
@@ -137,10 +129,8 @@ export default function App() {
                   return;
                 }
 
-                // Store raw JWT ID Token for all backend API calls
                 setAuthToken(idToken);
 
-                // Decode user claims from the ID Token
                 try {
                   const base64Url = idToken.split('.')[1];
                   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -179,10 +169,8 @@ export default function App() {
     );
   }
 
-  // ── Authenticated app shell ─────────────────────────────────────────────
   return (
     <div className="app-shell">
-      {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="app-logo">
@@ -192,7 +180,6 @@ export default function App() {
           <p className="app-tagline">Your Private PDF Analyzer</p>
         </div>
 
-        {/* User profile strip */}
         {user && (
           <div className="user-strip">
             {user.picture ? (
@@ -243,7 +230,6 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ── Chat main ── */}
       <main className="chat-main">
         <header className="chat-header">
           <div>
